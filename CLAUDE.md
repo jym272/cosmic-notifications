@@ -75,9 +75,13 @@ no longer the update channel — this repo is. The cycle:
 ## Workflow (mandatory)
 
 1. **Discuss first.** Every feature/fix/refactor idea is discussed with Jorge before work starts.
-2. **Create an issue** for it — but first scan open issues. Open-issue awareness matters: comment
-   on related issues when genuinely relevant (including "closing as delivered by #N" comments),
-   never as noise.
+2. **Create an issue** for it — ALWAYS on this fork
+   (`jym272/cosmic-notifications`), NEVER on the upstream community repo
+   (`pop-os/cosmic-notifications`); pass `--repo jym272/cosmic-notifications` explicitly to `gh`,
+   since the `upstream` git remote makes bare `gh` commands ambiguous. Nothing is ever filed,
+   commented, or PR'd upstream without Jorge explicitly asking for it. Before creating, scan open
+   issues — open-issue awareness matters: comment on related issues when genuinely relevant
+   (including "closing as delivered by #N" comments), never as noise.
 3. **Branch off `master`**, work on the PR. Reference the issue.
 4. **Before pushing**: update any docs affected by the change (`README.md`, `docs/`), then run
    local CI (below). Never open a PR with failing CI.
