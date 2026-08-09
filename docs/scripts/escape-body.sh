@@ -8,13 +8,20 @@
 #
 # Order matters: `&` MUST be replaced first, otherwise it re-escapes the
 # ampersands introduced by the later replacements ("<" -> "&lt;" -> "&amp;lt;").
+#
+# The backslashes are load-bearing, do not "clean them up": since bash 5.2
+# (patsub_replacement, on by default) an unquoted `&` in the replacement half of
+# ${var//pat/rep} stands for the text the pattern matched, so `${s//</&lt;}`
+# yields "<lt;", not "&lt;". `\&` is the documented escape for it, and the
+# backslash is removed during quote removal, so the same lines are also correct
+# on pre-5.2 bash where `&` had no special meaning. Verified on 5.2.21.
 escape_body() {
   local s=$1
-  s=${s//&/&amp;}
-  s=${s//</&lt;}
-  s=${s//>/&gt;}
-  s=${s//\"/&quot;}
-  s=${s//\'/&apos;}
+  s=${s//&/\&amp;}
+  s=${s//</\&lt;}
+  s=${s//>/\&gt;}
+  s=${s//\"/\&quot;}
+  s=${s//\'/\&apos;}
   printf '%s' "$s"
 }
 

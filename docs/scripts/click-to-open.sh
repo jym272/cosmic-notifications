@@ -14,6 +14,17 @@
 CMD=("${@:-}")
 [ ${#CMD[@]} -eq 0 ] || [ -z "${CMD[0]}" ] && CMD=(xdg-open https://github.com/pop-os/cosmic-notifications)
 
+# The command is free text from argv, and the body is parsed as HTML, so escape
+# it before concatenating with our own <b> tags — otherwise `./click-to-open.sh
+# sh -c 'grep "<pat>" f'` shows a body with the `<pat>` swallowed as a tag.
+# Reusable helper + the "& first" ordering rule: scripts/escape-body.sh.
+BODY_CMD=${CMD[*]}
+BODY_CMD=${BODY_CMD//&/\&amp;}
+BODY_CMD=${BODY_CMD//</\&lt;}
+BODY_CMD=${BODY_CMD//>/\&gt;}
+BODY_CMD=${BODY_CMD//\"/\&quot;}
+BODY_CMD=${BODY_CMD//\'/\&apos;}
+
 LOG=$(mktemp)
 trap 'rm -f "$LOG"' EXIT
 timeout 35 gdbus monitor --session --dest org.freedesktop.Notifications > "$LOG" &
@@ -24,7 +35,7 @@ ID=$(gdbus call --session --dest org.freedesktop.Notifications \
   --object-path /org/freedesktop/Notifications \
   --method org.freedesktop.Notifications.Notify \
   "click-demo" 0 "web-browser" \
-  "Click me" "Clicking this card runs: <b>${CMD[*]}</b>" \
+  "Click me" "Clicking this card runs: <b>${BODY_CMD}</b>" \
   "['default', 'Open']" "{'urgency': <byte 2>}" 30000 | grep -oP '(?<=uint32 )\d+')
 
 if [ -z "$ID" ]; then
