@@ -2,6 +2,22 @@
 
 Layer Shell notifications daemon which integrates with COSMIC.
 
+> **This fork** ([jym272/cosmic-notifications](https://github.com/jym272/cosmic-notifications))
+> tracks upstream `master` (what Pop!_OS actually ships) and carries our customizations.
+>
+> - **Start here (humans and agents):** [CLAUDE.md](CLAUDE.md) — architecture summary, gotchas,
+>   and the mandatory issue → PR → review → authorized-merge workflow.
+> - **Internals:** [docs/architecture.md](docs/architecture.md)
+> - **Using the daemon from other tools (D-Bus contract + runnable scripts):**
+>   [docs/contract.md](docs/contract.md)
+>
+> Quick start on Pop!_OS 24.04 (deps below already satisfied by a stock install + rustup + just):
+> `just build-release`, test with
+> `pkill -x -f cosmic-notifications; RUST_LOG=info ./target/release/cosmic-notifications`
+> (plain `pkill cosmic-notifications` never matches — see CLAUDE.md), deploy with
+> `sudo $(which just) deploy` (then `sudo apt-mark hold cosmic-notifications` so updates don't
+> overwrite it).
+
 # Building
 
 Cosmic Notifications is set up to build a deb and a Nix flake, but it can be built using just.

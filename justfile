@@ -61,6 +61,11 @@ tokio-console: build-release
 install:
     install -Dm0755 {{bin-src}} {{bin-dst}}
 
+# Installs the binary and restarts the daemon (cosmic-session respawns it).
+# Run as: sudo $(which just) deploy   (just lives in linuxbrew, not in root's PATH)
+deploy: install
+    pkill -x -f {{name}} || echo "warning: no running '{{name}}' matched — the old binary is still live"
+
 # Uninstalls installed files
 uninstall:
     rm {{bin-dst}}
