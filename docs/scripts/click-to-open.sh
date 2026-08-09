@@ -26,6 +26,15 @@ ID=$(gdbus call --session --dest org.freedesktop.Notifications \
   "Click me" "Clicking this card runs: <b>${CMD[*]}</b>" \
   "['default', 'Open']" "{'urgency': <byte 2>}" 30000 | grep -oP '(?<=uint32 )\d+')
 
+if [ -z "$ID" ]; then
+  echo "Notify failed (no id returned) — is cosmic-notifications running?" >&2
+  kill "$MONPID" 2>/dev/null
+  exit 1
+fi
+
+# The daemon emits no NotificationClosed when a card expires on its own (see
+# docs/contract.md), so the 35s monitor is the real upper bound here, not the
+# 30s expire_timeout.
 echo "notification id: $ID — waiting up to 35s for a click..."
 
 RESULT=timeout

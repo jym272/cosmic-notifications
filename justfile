@@ -64,7 +64,7 @@ install:
 # Installs the binary and restarts the daemon (cosmic-session respawns it).
 # Run as: sudo $(which just) deploy   (just lives in linuxbrew, not in root's PATH)
 deploy: install
-    pkill -x -f {{name}} || true
+    pkill -x -f {{name}} || echo "warning: no running '{{name}}' matched — the old binary is still live"
 
 # Uninstalls installed files
 uninstall:

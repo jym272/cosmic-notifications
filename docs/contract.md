@@ -27,7 +27,11 @@ gdbus call --session --dest org.freedesktop.Notifications \
   "[]" "{}" 5000
 ```
 
-- `replaces_id`: pass a previous id to update that notification in place; `0` for new.
+- `replaces_id`: pass a previous id to update that notification in place; `0` for new. The reply
+  is that same id. Only *displayed* notifications are replaced in place — if the id already
+  expired or was closed, the call silently creates a new card with that id. A replacement does
+  **not** restart the expiry timer: the card still disappears on the original notification's
+  schedule, so re-sending every second to "keep it alive" does not work (use `expire_timeout: 0`).
 - `app_icon`: theme icon name, or a `file://` URL.
 - Summary renders **first line only**. Body renders at 12 px below it.
 
@@ -59,11 +63,11 @@ URL" work, attach a `default` action and handle `ActionInvoked` (below).
 
 | Hint | Type | Notes |
 |---|---|---|
-| `urgency` | `y` | 0/1/2 — affects timeout cap, max_per_app bypass |
+| `urgency` | `y` | 0/1/2 — affects the timeout cap only (anything other than 0/1/2 is treated as low) |
 | `image-path` | `s` | **must be `file://` URL**; bare string = theme-icon name. Renders 16 px |
 | `image-data` | `(iiibiiay)` | raw image struct; also 16 px |
-| `sound-name` / `sound-file` | `s` | freedesktop sound name / file path |
-| `suppress-sound`, `transient`, `resident`, `category`, `desktop-entry`, `action-icons` | | per spec |
+| `sound-name` / `sound-file` | `s` | parsed but **never played** — the daemon advertises the `sound` capability with no sound implementation |
+| `suppress-sound`, `transient`, `resident`, `category`, `desktop-entry`, `action-icons`, `x`, `y` | | accepted and parsed; only `transient` (skips the applet/history feed) changes behavior |
 
 ## Actions and click handling
 
@@ -87,8 +91,17 @@ Real apps should use libnotify / zbus / Gio, which handle the subscription for y
 ## Other methods and signals
 
 - `CloseNotification(id)` — programmatic close.
-- `NotificationClosed(id, reason)` — reasons: 1 expired, 2 dismissed, 3 CloseNotification,
-  4 undefined.
+- `NotificationClosed(id, reason)` — spec reasons are 1 expired, 2 dismissed, 3 CloseNotification,
+  4 undefined, but **this daemon only ever sends 2 and 3** (verified live):
+
+  | What happened | Signals emitted |
+  |---|---|
+  | Notification expired on its own | **none at all** |
+  | User clicked or dismissed the card | `(id, 2)` |
+  | Client called `CloseNotification(id)` | `(id, 3)` **and** `(id, 2)` — two signals |
+
+  So do not treat `NotificationClosed` as a reliable end-of-life event, do not expect reason 1,
+  and make your handler idempotent — a programmatic close delivers it twice.
 - `GetServerInformation()` → `("cosmic-notifications", "System76", "0.1.0", "1.2")`.
 
 ## Scripts

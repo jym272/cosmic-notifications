@@ -26,17 +26,23 @@ with runnable examples in `docs/scripts/`.
 
 ## Verified gotchas
 
-- `expire_timeout` is clamped in `app.rs` (`fn update`, Notify arm): max 5000 ms normal,
-  3000 ms low urgency; **uncapped for urgency=2**. `0` = persistent, `-1` = 3000 ms.
+- `expire_timeout` is clamped in `app.rs` (`fn push_notification`): max 5000 ms normal,
+  3000 ms low urgency; **uncapped for urgency=2**. `0` = persistent, `-1` = 3000 ms. Replacing a
+  notification (`replaces_id`) does **not** restart its timer.
+- `NotificationClosed` is only emitted with reason 2 (dismissed) and 3 (`CloseNotification`, which
+  emits *both* 3 and 2); expiry emits nothing. `fn close` drops the `Input::Closed` send future
+  without awaiting it — upstream bug, see `docs/contract.md`.
 - Body markup supports only `<b> <i> <u> <a> <br>`. `<a>` renders styled but is **not clickable**
   — the span never gets the href and rich-text events map to `Message::Ignore`. Card click fires
   the `default` action instead (via XDG activation token + `ActionInvoked` signal).
 - No per-action buttons on popup cards: one click target per notification.
 - `image-path` hint must be a `file://` URL (bare paths are treated as theme-icon names); images
   render at 16 px next to the app name. `<img>` tag is an upstream TODO.
-- Test loop: `pkill -x -f cosmic-notifications && ./target/release/cosmic-notifications` in a
-  terminal (live tracing logs). Kill it twice quickly if cosmic-session keeps respawning it. Log
-  out/in restores stock behavior.
+- Test loop: `pkill -x -f cosmic-notifications; RUST_LOG=info ./target/release/cosmic-notifications`
+  in a terminal. `RUST_LOG` is required — the tracing default directive is `WARN`, so without it
+  the daemon prints essentially nothing (use `debug`/`trace` for the notification flow). Use `;`
+  not `&&`: `pkill` exits 1 when nothing matched, which would skip the run. Kill it twice quickly
+  if cosmic-session keeps respawning it. Log out/in restores stock behavior.
 - `pkill cosmic-notifications` silently matches nothing: the kernel truncates process names to
   15 chars, and the daemon's cmdline is the bare name (no `/usr/bin/` prefix). Always use
   `pkill -x -f cosmic-notifications`. Verify which binary a running daemon executes with

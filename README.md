@@ -13,9 +13,10 @@ Layer Shell notifications daemon which integrates with COSMIC.
 >
 > Quick start on Pop!_OS 24.04 (deps below already satisfied by a stock install + rustup + just):
 > `just build-release`, test with
-> `pkill cosmic-notifications && ./target/release/cosmic-notifications`, deploy with
-> `sudo just install` (then `sudo apt-mark hold cosmic-notifications` so updates don't overwrite
-> it).
+> `pkill -x -f cosmic-notifications; RUST_LOG=info ./target/release/cosmic-notifications`
+> (plain `pkill cosmic-notifications` never matches — see CLAUDE.md), deploy with
+> `sudo $(which just) deploy` (then `sudo apt-mark hold cosmic-notifications` so updates don't
+> overwrite it).
 
 # Building
 
