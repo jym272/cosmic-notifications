@@ -5,13 +5,25 @@
 # Usage: ./click-to-open.sh [command...]
 #   default command: xdg-open https://github.com/pop-os/cosmic-notifications
 #
-# How it works (see docs/contract.md): the daemon never launches apps. Clicking
-# the card emits ActionInvoked(id, "default") on the session bus; a listener
-# must be alive to react. This script starts the listener BEFORE sending, to
-# avoid missing a fast click.
+# How it works (see docs/contract.md): for actions the daemon launches nothing
+# — body hyperlinks are the one thing it opens itself, and this card has none.
+# Clicking the card emits ActionInvoked(id, "default") on the session bus; a
+# listener must be alive to react. This script starts the listener BEFORE
+# sending, to avoid missing a fast click.
 
 CMD=("${@:-}")
 [ ${#CMD[@]} -eq 0 ] || [ -z "${CMD[0]}" ] && CMD=(xdg-open https://github.com/pop-os/cosmic-notifications)
+
+# The command is free text from argv, and the body is parsed as HTML, so escape
+# it before concatenating with our own <b> tags — otherwise `./click-to-open.sh
+# sh -c 'grep "<pat>" f'` shows a body with the `<pat>` swallowed as a tag.
+# Reusable helper + the "& first" ordering rule: scripts/escape-body.sh.
+BODY_CMD=${CMD[*]}
+BODY_CMD=${BODY_CMD//&/\&amp;}
+BODY_CMD=${BODY_CMD//</\&lt;}
+BODY_CMD=${BODY_CMD//>/\&gt;}
+BODY_CMD=${BODY_CMD//\"/\&quot;}
+BODY_CMD=${BODY_CMD//\'/\&apos;}
 
 LOG=$(mktemp)
 trap 'rm -f "$LOG"' EXIT
@@ -23,7 +35,7 @@ ID=$(gdbus call --session --dest org.freedesktop.Notifications \
   --object-path /org/freedesktop/Notifications \
   --method org.freedesktop.Notifications.Notify \
   "click-demo" 0 "web-browser" \
-  "Click me" "Clicking this card runs: <b>${CMD[*]}</b>" \
+  "Click me" "Clicking this card runs: <b>${BODY_CMD}</b>" \
   "['default', 'Open']" "{'urgency': <byte 2>}" 30000 | grep -oP '(?<=uint32 )\d+')
 
 if [ -z "$ID" ]; then

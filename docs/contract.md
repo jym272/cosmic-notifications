@@ -59,7 +59,9 @@ HTML subset only (Freedesktop spec — **not** Markdown): `<b>`, `<i>`, `<u>`, `
 **Escape your free text.** The body is parsed as HTML, so `<` and `&` in user-supplied text must
 be sent escaped: `&lt;` `&gt;` `&amp;` `&quot;` `&apos;`, or numeric refs (`&#60;`, `&#x3E;`).
 The daemon decodes those after tag parsing — a decoded `<` never opens a tag. Unknown entities
-(`&nbsp;`) and lone ampersands (`Q&A`) are left as-is rather than dropped.
+(`&nbsp;`) and lone ampersands (`Q&A`) are left as-is rather than dropped. Replace `&` **first**,
+or you re-escape the entities you just introduced; copy the helper in
+[scripts/escape-body.sh](scripts/escape-body.sh).
 
 `<a href="…">` is **clickable**: the link opens in the desktop's default handler (`xdg-open`),
 with the XDG activation token passed through so the browser gets focus. Details:
@@ -94,7 +96,8 @@ with the XDG activation token passed through so the browser gets focus. Details:
 The popup card has **one click target** (the whole card) and renders **no action buttons**.
 A click invokes: the `default` action if present → else the first action → else it just dismisses.
 
-The daemon never launches anything. On click it emits:
+For actions, the daemon launches nothing — body hyperlinks (above) are the one thing it opens
+itself. On a card click it only emits:
 
 1. `ActivationToken(id u, token s)` — XDG activation token so the app you launch gets focus.
 2. `ActionInvoked(id u, action_key s)`.
@@ -130,5 +133,6 @@ Real apps should use libnotify / zbus / Gio, which handle the subscription for y
 |---|---|
 | [scripts/hello.sh](scripts/hello.sh) | Minimal Notify call |
 | [scripts/markup-test.sh](scripts/markup-test.sh) | b/i/u/a markup, clickable links, entity escaping |
+| [scripts/escape-body.sh](scripts/escape-body.sh) | reusable `escape_body()`; same text unescaped vs escaped |
 | [scripts/persistent.sh](scripts/persistent.sh) | `expire_timeout=0` + critical urgency |
 | [scripts/click-to-open.sh](scripts/click-to-open.sh) | default action + ActionInvoked listener → launches an app |
