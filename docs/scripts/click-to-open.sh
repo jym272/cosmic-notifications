@@ -5,10 +5,11 @@
 # Usage: ./click-to-open.sh [command...]
 #   default command: xdg-open https://github.com/pop-os/cosmic-notifications
 #
-# How it works (see docs/contract.md): the daemon never launches apps. Clicking
-# the card emits ActionInvoked(id, "default") on the session bus; a listener
-# must be alive to react. This script starts the listener BEFORE sending, to
-# avoid missing a fast click.
+# How it works (see docs/contract.md): for actions the daemon launches nothing
+# — body hyperlinks are the one thing it opens itself, and this card has none.
+# Clicking the card emits ActionInvoked(id, "default") on the session bus; a
+# listener must be alive to react. This script starts the listener BEFORE
+# sending, to avoid missing a fast click.
 
 CMD=("${@:-}")
 [ ${#CMD[@]} -eq 0 ] || [ -z "${CMD[0]}" ] && CMD=(xdg-open https://github.com/pop-os/cosmic-notifications)
