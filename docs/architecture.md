@@ -12,6 +12,10 @@ Detailed component map of the daemon. For the external D-Bus usage contract see
 3. Streams every notification to the panel's notifications applet over a Unix socket pair, so the
    applet's history/tray stays in sync. The FDs are exchanged through the env vars
    `PANEL_NOTIFICATIONS_FD` / `DAEMON_NOTIFICATIONS_FD` (see `cosmic-notifications-config`).
+   `setup_panel_socket` marks **both** the inherited FD and its dup `CLOEXEC`: the daemon spawns
+   children (`xdg-open` for body hyperlinks), and a copy of this socket leaking into a long-lived
+   browser process would hide the daemon's exit from the panel — the applet's end would never see
+   a hangup.
 
 ## Crate / file map
 

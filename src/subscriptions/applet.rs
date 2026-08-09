@@ -49,7 +49,19 @@ pub fn setup_panel_socket() -> Result<UnixStream> {
         bail!("DAEMON_NOTIFICATIONS_FD is not a valid RawFd.");
     };
 
-    let fd = unsafe { BorrowedFd::borrow_raw(raw_fd).try_clone_to_owned().unwrap() };
+    let inherited = unsafe { BorrowedFd::borrow_raw(raw_fd) };
+
+    // The fd we inherited from cosmic-session stays open for the life of the process and is not
+    // close-on-exec (it was inherited across an exec). `try_clone_to_owned` only sets the flag on
+    // the duplicate, so mark the original too: the daemon spawns children (`xdg-open` for body
+    // hyperlinks), and a leaked copy of this socket would keep the panel's end from ever seeing a
+    // hangup after the daemon exits.
+    rustix::io::fcntl_setfd(
+        inherited,
+        rustix::io::fcntl_getfd(inherited)? | rustix::io::FdFlags::CLOEXEC,
+    )?;
+
+    let fd = inherited.try_clone_to_owned().unwrap();
     info!("Connecting to daemon on fd {}", raw_fd);
 
     rustix::io::fcntl_setfd(
