@@ -67,6 +67,12 @@ with the XDG activation token passed through so the browser gets focus. Details:
 - Only `http:`, `https:` and `mailto:` URLs are accepted. Anything else — `file:`, `javascript:`,
   app-specific schemes — and relative hrefs render as plain text, unstyled and inert. Link styling
   (accent color + underline) therefore always means "this opens something".
+- Innermost `<a>` wins: a nested anchor never inherits an outer href, so a rejected inner href
+  stays inert rather than borrowing the outer URL.
+- Tag names are matched case-sensitively (upstream behavior): `<A HREF="…">` is not a link, same
+  as `<B>` is not bold.
+- The card shows the link **text**, not its destination, and there is no hover preview — a body
+  can label an arbitrary URL as anything. Only render bodies from senders you trust.
 - Clicking a link does **not** invoke the notification's action or dismiss the card; the click is
   consumed by the link. Clicking anywhere else on the card behaves as before.
 - The daemon does not emit `ActionInvoked` for link clicks — no listener is needed, so this works

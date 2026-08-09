@@ -134,7 +134,7 @@ fn _handle_recursive(
     handle: &tl::NodeHandle,
     parser: &tl::Parser,
     tags: &mut Vec<String>,
-    links: &mut Vec<Link>,
+    links: &mut Vec<Option<Link>>,
     buffer: &mut Vec<Span<'static, Link>>,
 ) {
     if let Some(node) = handle.get(parser) {
@@ -142,13 +142,17 @@ fn _handle_recursive(
             tl::Node::Tag(tag) => {
                 let tag_name = tag.name().as_utf8_str();
 
-                let mut pushed_link = false;
-                if tag_name == "a"
-                    && let Some(href) = tag.attributes().get("href").flatten()
-                    && let Some(url) = sanitize_href(&decode_entities(&href.as_utf8_str()))
-                {
-                    links.push(url);
-                    pushed_link = true;
+                // Every `<a>` pushes an entry, even when its href is missing or rejected, so the
+                // innermost anchor always wins: a nested `<a href="javascript:…">` must not
+                // inherit an ancestor's URL and render as clickable.
+                let is_anchor = tag_name == "a";
+                if is_anchor {
+                    links.push(
+                        tag.attributes()
+                            .get("href")
+                            .flatten()
+                            .and_then(|href| sanitize_href(&decode_entities(&href.as_utf8_str()))),
+                    );
                 }
                 tags.push(tag_name.into_owned());
 
@@ -157,13 +161,17 @@ fn _handle_recursive(
                 });
 
                 tags.pop();
-                if pushed_link {
+                if is_anchor {
                     links.pop();
                 }
             }
             tl::Node::Raw(bytes) => {
                 let raw = bytes.as_utf8_str();
-                buffer.push(sanitize_html(tags, links.last(), &decode_entities(&raw)));
+                buffer.push(sanitize_html(
+                    tags,
+                    links.last().and_then(Option::as_ref),
+                    &decode_entities(&raw),
+                ));
             }
             _ => {}
         }
@@ -179,7 +187,7 @@ pub fn html_to_spans(text: &str) -> Vec<Span<'static, Link>> {
         let parser = vdom.parser();
         let elements = vdom.children();
         let mut tags = Vec::new();
-        let mut links = Vec::new();
+        let mut links: Vec<Option<Link>> = Vec::new();
 
         for node_handle in elements {
             _handle_recursive(node_handle, parser, &mut tags, &mut links, &mut buffer);
@@ -260,6 +268,15 @@ mod tests {
             assert!(span.link.is_none(), "{body} should not be clickable");
             assert!(!span.underline, "{body} should not be styled as a link");
         }
+    }
+
+    #[test]
+    fn nested_anchor_does_not_inherit_the_outer_link() {
+        let spans =
+            html_to_spans(r#"<a href="https://ok.test"><a href="javascript:evil">x</a></a>"#);
+        let span = spans.iter().find(|s| s.text == "x").unwrap();
+        assert!(span.link.is_none());
+        assert!(!span.underline);
     }
 
     #[test]
