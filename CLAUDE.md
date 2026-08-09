@@ -78,7 +78,11 @@ no longer the update channel — this repo is. The cycle:
 5. **Wait for code review.** Be critical of it — push back on points you disagree with; commit
    only the changes you agree with. Before that commit, refresh docs made stale by the review and
    update/refactor this CLAUDE.md concisely, only if necessary.
-6. **Merge only with explicit authorization from Jorge.** No exceptions.
+6. **PR descriptions are TIMELESS.** Whenever a new commit lands on a PR (review fixes, revisions,
+   anything), rewrite the description to reflect the PR's current state. Never stack onto it or
+   treat it as a historic log — no "due to review, now we…" phrasing. History lives in commits
+   and review threads, not the description.
+7. **Merge only with explicit authorization from Jorge.** No exceptions.
 
 ## Local CI (run before every PR push)
 
