@@ -34,11 +34,37 @@ with runnable examples in `docs/scripts/`.
 - No per-action buttons on popup cards: one click target per notification.
 - `image-path` hint must be a `file://` URL (bare paths are treated as theme-icon names); images
   render at 16 px next to the app name. `<img>` tag is an upstream TODO.
-- Test loop: `pkill cosmic-notifications && ./target/release/cosmic-notifications` in a terminal
-  (live tracing logs). Kill it twice quickly if cosmic-session keeps respawning it. Log out/in
-  restores stock behavior.
-- Deploying (`sudo just install`) overwrites the apt-managed binary; `apt upgrade` will clobber it
-  back. Use `sudo apt-mark hold cosmic-notifications` while running a custom build.
+- Test loop: `pkill -x -f cosmic-notifications && ./target/release/cosmic-notifications` in a
+  terminal (live tracing logs). Kill it twice quickly if cosmic-session keeps respawning it. Log
+  out/in restores stock behavior.
+- `pkill cosmic-notifications` silently matches nothing: the kernel truncates process names to
+  15 chars, and the daemon's cmdline is the bare name (no `/usr/bin/` prefix). Always use
+  `pkill -x -f cosmic-notifications`. Verify which binary a running daemon executes with
+  `ls -l /proc/$(pgrep -f '^cosmic-notifications$')/exe` — ` (deleted)` means it predates the
+  last install and needs a restart.
+- `sudo just ...` fails with `command not found`: just is installed via linuxbrew, which isn't in
+  root's PATH. Use `sudo $(which just) ...`.
+
+## Privileges — agents never run sudo
+
+Agents CANNOT run sudo commands (no terminal for the password prompt — do not attempt it, ever).
+Jorge runs everything privileged. Agents may freely run unprivileged commands: builds, `pgrep`/
+`pkill` of Jorge's own processes, `apt-mark showhold`, `gh`, the docs/scripts, etc. When a step
+needs root, stop and hand Jorge the exact command to run.
+
+## Deployment flow (current state: custom build deployed)
+
+This machine runs the fork's own binary at `/usr/bin/cosmic-notifications`, and the apt package
+is frozen (`apt-mark showhold` → `cosmic-notifications`) so OS updates can't overwrite it. Apt is
+no longer the update channel — this repo is. The cycle:
+
+1. PR merged into `master` (only ever with Jorge's authorization).
+2. Agent: `git checkout master && git pull origin master`, then `just build-release`.
+3. Agent verifies the build and **reports to Jorge that it's ready to install** — nothing more.
+4. Jorge deploys: `sudo $(which just) deploy` (installs the binary and restarts the daemon;
+   cosmic-session respawns it).
+5. Agent verifies the switch: `/proc/<pid>/exe` points at a non-deleted binary, and a
+   `docs/scripts/hello.sh` notification renders.
 
 ## Workflow (mandatory)
 
