@@ -29,6 +29,7 @@ tokio = { version = "1.52.1", features = [
     "macros",
     "net",
     "io-util",
+    "process",
 ] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.23", features = ["std", "env-filter"] }

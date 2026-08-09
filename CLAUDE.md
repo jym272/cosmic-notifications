@@ -32,9 +32,12 @@ with runnable examples in `docs/scripts/`.
 - `NotificationClosed` is only emitted with reason 2 (dismissed) and 3 (`CloseNotification`, which
   emits *both* 3 and 2); expiry emits nothing. `fn close` drops the `Input::Closed` send future
   without awaiting it — upstream bug, see `docs/contract.md`.
-- Body markup supports only `<b> <i> <u> <a> <br>`. `<a>` renders styled but is **not clickable**
-  — the span never gets the href and rich-text events map to `Message::Ignore`. Card click fires
-  the `default` action instead (via XDG activation token + `ActionInvoked` signal).
+- Body markup supports only `<b> <i> <u> <a> <br>`, plus HTML entity decoding (five XML named
+  entities + numeric refs; unknown ones stay literal). `<a href>` is clickable — only
+  http/https/mailto, other schemes render as inert unstyled text. A link click is captured by the
+  rich-text widget, so it never reaches the card: no `ActionInvoked`, no dismissal. Clicking
+  elsewhere on the card still fires the `default` action (XDG activation token +
+  `ActionInvoked`).
 - No per-action buttons on popup cards: one click target per notification.
 - `image-path` hint must be a `file://` URL (bare paths are treated as theme-icon names); images
   render at 16 px next to the app name. `<img>` tag is an upstream TODO.
@@ -115,6 +118,5 @@ find . -name "*.desktop" -exec desktop-file-validate {} +   # mirrors upstream's
 
 ## Candidate work (agreed direction, each needs an issue + discussion first)
 
-- Make `<a href>` hyperlinks actually clickable (markup.rs spans + app.rs message wiring).
 - Implement `<img>` tag rendering (upstream TODO in markup.rs).
 - Render buttons for non-default actions on popup cards.

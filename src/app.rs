@@ -69,6 +69,8 @@ struct CosmicNotifications {
 enum Message {
     ActivateNotification(u32),
     ActivationToken(Option<String>, u32, Option<ActionId>),
+    OpenLink(String),
+    LinkActivationToken(Option<String>, String),
     Dismissed(u32),
     Notification(notifications::Event),
     Timeout(u32),
@@ -509,9 +511,10 @@ impl CosmicNotifications {
                                             )
                                             .width(Length::Fill),
                                             Element::from(
-                                                rich_text(html_to_spans(&n.body)).size(12.0)
+                                                rich_text(html_to_spans(&n.body))
+                                                    .size(12.0)
+                                                    .on_link_click(Message::OpenLink)
                                             )
-                                            .map(|_: ()| Message::Ignore)
                                         ]
                                     )
                                     .width(Length::Fill),
@@ -644,6 +647,42 @@ impl CosmicNotifications {
         )
     }
 
+    fn request_link_activation(&mut self, url: String) -> Task<Message> {
+        activation::request_token(Some(String::from(Self::APP_ID)), Some(self.window_id))
+            .map(move |token| cosmic::Action::App(Message::LinkActivationToken(token, url.clone())))
+    }
+
+    /// Hand a body hyperlink to the desktop's URL handler.
+    ///
+    /// The URL scheme is already restricted to http/https/mailto by `html_to_spans`. The XDG
+    /// activation token is passed through the environment so the browser window gets focus; it is
+    /// merely a hint, so a missing token is not fatal.
+    fn open_link(url: String, token: Option<String>) -> Task<Message> {
+        Task::future(async move {
+            let mut cmd = tokio::process::Command::new("xdg-open");
+            cmd.arg(&url)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+
+            if let Some(token) = token {
+                cmd.env("XDG_ACTIVATION_TOKEN", token);
+            } else {
+                tracing::warn!("No activation token for link; opening unfocused");
+                cmd.env_remove("XDG_ACTIVATION_TOKEN");
+            }
+
+            // The child is dropped immediately: tokio reaps it in the background, and the daemon
+            // does not care about the outcome.
+            match cmd.spawn() {
+                Ok(_) => tracing::info!("opened link {url}"),
+                Err(err) => tracing::error!("Failed to run xdg-open for {url}: {err}"),
+            }
+
+            cosmic::Action::App(Message::Ignore)
+        })
+    }
+
     fn activate_notification(
         &mut self,
         token: String,
@@ -770,6 +809,13 @@ impl cosmic::Application for CosmicNotifications {
                 } else {
                     tracing::error!("Failed to get activation token for clicked notification.");
                 }
+            }
+            Message::OpenLink(url) => {
+                tracing::trace!("requesting token for link {url}");
+                return self.request_link_activation(url);
+            }
+            Message::LinkActivationToken(token, url) => {
+                return Self::open_link(url, token);
             }
             Message::Notification(e) => match e {
                 notifications::Event::Notification(n) => {

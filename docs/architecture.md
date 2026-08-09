@@ -22,7 +22,7 @@ Detailed component map of the daemon. For the external D-Bus usage contract see
 | `src/subscriptions/notifications.rs` | zbus interface: `Notify`, `CloseNotification`, `GetCapabilities`, `GetServerInformation`; emits `ActionInvoked`, `NotificationClosed`, `ActivationToken` |
 | `src/subscriptions/applet.rs` | Unix-socket p2p connection to the panel applet (`com.system76.NotificationsSocket`) |
 | `cosmic-notifications-util/src/lib.rs` | `Notification`, `Hint` parsing (urgency, image-path/data, sound hints…), `Image`, `ActionId`, `CloseReason` |
-| `cosmic-notifications-util/src/markup.rs` | `html_to_spans()` — body markup → iced rich-text spans (`tl` parser; tags b/i/u/a/br) |
+| `cosmic-notifications-util/src/markup.rs` | `html_to_spans()` — body markup → iced rich-text spans (`tl` parser; tags b/i/u/a/br), HTML entity decoding, `href` sanitizing (http/https/mailto only) |
 | `cosmic-notifications-config/src/lib.rs` | `NotificationsConfig` (cosmic-config, ID `com.system76.CosmicNotifications`, version 1) |
 
 ## Notification lifecycle
@@ -41,6 +41,10 @@ Detailed component map of the daemon. For the external D-Bus usage contract see
    `ActivationToken` signal + `ActionInvoked(id, action)` signal → card dismissed. Action chosen:
    the clicked action if valid, else `default` if present, else the first action, else the click
    just dismisses.
+   Click on a body hyperlink instead → `Message::OpenLink` → own activation token request
+   (`Message::LinkActivationToken`) → `xdg-open <url>` with `XDG_ACTIVATION_TOKEN` in its env.
+   The rich-text widget captures the press, so the card's own click handler never runs: no
+   `ActionInvoked`, no dismissal, no D-Bus traffic at all.
 5. `NotificationClosed(id, reason)` emission (verified live, spec reasons are 1 expired,
    2 dismissed, 3 closed by call, 4 undefined):
    - **expiry** (`fn expire`) emits **nothing** — the card just moves to `hidden`;
