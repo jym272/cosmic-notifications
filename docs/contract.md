@@ -56,8 +56,28 @@ To exceed 5 s, send `urgency: <byte 2>`. Caps are user-configurable (see archite
 HTML subset only (Freedesktop spec — **not** Markdown): `<b>`, `<i>`, `<u>`, `<a href="…">`,
 `<br>`. Anything else is stripped/ignored (`<img>` not implemented).
 
-⚠️ `<a>` renders underlined in the accent color but is **not clickable**. To make "click opens a
-URL" work, attach a `default` action and handle `ActionInvoked` (below).
+**Escape your free text.** The body is parsed as HTML, so `<` and `&` in user-supplied text must
+be sent escaped: `&lt;` `&gt;` `&amp;` `&quot;` `&apos;`, or numeric refs (`&#60;`, `&#x3E;`).
+The daemon decodes those after tag parsing — a decoded `<` never opens a tag. Unknown entities
+(`&nbsp;`) and lone ampersands (`Q&A`) are left as-is rather than dropped.
+
+`<a href="…">` is **clickable**: the link opens in the desktop's default handler (`xdg-open`),
+with the XDG activation token passed through so the browser gets focus. Details:
+
+- Only `http:`, `https:` and `mailto:` URLs are accepted. Anything else — `file:`, `javascript:`,
+  app-specific schemes — and relative hrefs render as plain text, unstyled and inert. Link styling
+  (accent color + underline) therefore always means "this opens something".
+- Innermost `<a>` wins: a nested anchor never inherits an outer href, so a rejected inner href
+  stays inert rather than borrowing the outer URL.
+- Tag names are matched case-sensitively (upstream behavior): `<A HREF="…">` is not a link, same
+  as `<B>` is not bold.
+- The card shows the link **text**, not its destination, and there is no hover preview — a body
+  can label an arbitrary URL as anything. Only render bodies from senders you trust.
+- Clicking a link does **not** invoke the notification's action or dismiss the card; the click is
+  consumed by the link. Clicking anywhere else on the card behaves as before.
+- The daemon does not emit `ActionInvoked` for link clicks — no listener is needed, so this works
+  for fire-and-forget senders. For "click anywhere on the card opens X", still use a `default`
+  action (below).
 
 ## Hints
 
@@ -109,6 +129,6 @@ Real apps should use libnotify / zbus / Gio, which handle the subscription for y
 | Script | Demonstrates |
 |---|---|
 | [scripts/hello.sh](scripts/hello.sh) | Minimal Notify call |
-| [scripts/markup-test.sh](scripts/markup-test.sh) | b/i/u/a markup rendering |
+| [scripts/markup-test.sh](scripts/markup-test.sh) | b/i/u/a markup, clickable links, entity escaping |
 | [scripts/persistent.sh](scripts/persistent.sh) | `expire_timeout=0` + critical urgency |
 | [scripts/click-to-open.sh](scripts/click-to-open.sh) | default action + ActionInvoked listener → launches an app |
