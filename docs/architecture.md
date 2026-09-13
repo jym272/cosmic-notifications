@@ -40,11 +40,17 @@ Detailed component map of the daemon. For the external D-Bus usage contract see
    exist at a time — extra `cards` simply get no popup. `max_per_app` (2) is only a *reordering*
    pass (`group_notifications`): per-app overflow is moved to the back of `cards`, not removed
    and not hidden, and despite the config doc comment urgency does not exempt a notification
-   from it. `hidden` holds only already-expired notifications (for nothing but bookkeeping).
+   from it. `hidden` holds already-expired notifications (max 200) and is **not** dead
+   bookkeeping: `activate_notification` searches `cards` first and then `hidden`, which is what
+   keeps an expired notification's applet-feed entry clickable after its popup is gone.
 4. Click on card → `Message::ActivateNotification` → request XDG activation token →
    `ActivationToken` signal + `ActionInvoked(id, action)` signal → card dismissed. Action chosen:
    the clicked action if valid, else `default` if present, else the first action, else the click
    just dismisses.
+   Click on an entry in the applet's history feed → the applet calls `invoke_action(id, action)`
+   over the socket → `Input::AppletActivated` → `Message::ActivateNotification` on the same path
+   as above, so the feed emits the identical signal pair. The ✕ on a card is wired to
+   `Message::Dismissed` directly and never enters this path.
    Click on a body hyperlink instead → `Message::OpenLink` → own activation token request
    (`Message::LinkActivationToken`) → `xdg-open <url>` with `XDG_ACTIVATION_TOKEN` in its env.
    The rich-text widget captures the press, so the card's own click handler never runs: no

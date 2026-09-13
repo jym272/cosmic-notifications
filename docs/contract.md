@@ -32,6 +32,10 @@ gdbus call --session --dest org.freedesktop.Notifications \
   expired or was closed, the call silently creates a new card with that id. A replacement does
   **not** restart the expiry timer: the card still disappears on the original notification's
   schedule, so re-sending every second to "keep it alive" does not work (use `expire_timeout: 0`).
+  A replacement also **replaces the notification wholesale — `actions` included**. Actions are
+  not inherited: re-send the full `actions` array on *every* `Notify` call, or the card keeps its
+  appearance and silently stops invoking anything (see
+  [Actions and click handling](#actions-and-click-handling)).
 - `app_icon`: theme icon name, or a `file://` URL.
 - Summary renders **first line only**. Body renders at 12 px below it.
 
@@ -93,14 +97,38 @@ with the XDG activation token passed through so the browser gets focus. Details:
 
 ## Actions and click handling
 
-The popup card has **one click target** (the whole card) and renders **no action buttons**.
-A click invokes: the `default` action if present → else the first action → else it just dismisses.
+The popup card renders **no action buttons**, and has exactly **two** click targets:
+
+| Target | Effect |
+|---|---|
+| The card body (everything else) | invokes an action, then closes the card |
+| The ✕ button | closes the card, invokes **nothing** |
+
+A body click invokes: the `default` action if present → else the first action → else it just
+dismisses. The ✕ never invokes anything under any timing — it is wired straight to the dismiss
+path and cannot reach the action code at all. A body hyperlink is a third target of sorts: it
+swallows the click entirely (see above), so it neither invokes nor dismisses.
 
 For actions, the daemon launches nothing — body hyperlinks (above) are the one thing it opens
-itself. On a card click it only emits:
+itself. On a card-body click it only emits:
 
 1. `ActivationToken(id u, token s)` — XDG activation token so the app you launch gets focus.
 2. `ActionInvoked(id u, action_key s)`.
+
+in that order, followed by `NotificationClosed(id, 2)` as the card closes.
+
+### The applet history feed is a second activation path
+
+Clicking an entry in the panel applet's notification history emits the **same** two signals as a
+card-body click, and works on a notification that has already expired off-screen. Expiry is not
+disposal: an expired notification moves to a `hidden` queue (capped at 200 entries) that is
+searched on activation, so its feed entry stays clickable long after the popup is gone. Only the
+`transient` hint keeps a notification out of the feed entirely.
+
+Activating from the feed consumes the entry, so a given id fires at most once. Treat the feed as
+a best-effort second path rather than your primary one: it depends on `cosmic-applet-notifications`
+being alive, and if that applet dies the popup path keeps working while every feed click silently
+does nothing (the daemon logs `Failed to notify applet of notification I/O error: Broken pipe`).
 
 **Your process must be alive and subscribed** to act on these. Fire-and-forget senders get
 dismiss-on-click only. Minimal shell pattern (full version: `scripts/click-to-open.sh`):
@@ -120,8 +148,13 @@ Real apps should use libnotify / zbus / Gio, which handle the subscription for y
   | What happened | Signals emitted |
   |---|---|
   | Notification expired on its own | **none at all** |
-  | User clicked or dismissed the card | `(id, 2)` |
+  | User dismissed the card (✕) | `(id, 2)` |
+  | User clicked the card body or a feed entry | `ActivationToken`, `ActionInvoked`, then `(id, 2)` |
   | Client called `CloseNotification(id)` | `(id, 3)` **and** `(id, 2)` — two signals |
+
+  Reason 2 therefore does **not** mean "dismissed" — it trails a successful activation just as it
+  trails a ✕. The presence of a preceding `ActionInvoked` is the only way to tell the two apart,
+  so never branch on the close reason to decide whether the user acted on a notification.
 
   So do not treat `NotificationClosed` as a reliable end-of-life event, do not expect reason 1,
   and make your handler idempotent — a programmatic close delivers it twice.
